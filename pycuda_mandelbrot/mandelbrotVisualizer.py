@@ -10,6 +10,25 @@ import ctypes
 import mpmath as pm
 
 
+#mandelbrot settings
+WIDTH = 900                             # Width and Height of the Mandelbrot calculation
+HEIGHT = WIDTH
+MAX_ITER = 255                          # iterations for mandelbrot caluclation
+UPPER_BOUND = 4                         # upper bound for mandelbrot calculation
+start_point = [-1.3887052905883253, 0]  # start point for visualization
+radius = 0.02579603060046148            # radius around start point
+
+#pygame settings
+sidebar = 400                       # sidebar size
+w, h = WIDTH + sidebar, HEIGHT      # pygame width and height
+if h < 700:                         # ensure full sidebar is visible
+    h = 700
+color = (255, 255, 190)             # font color
+ctime = 0                           # initial time value
+mode = 0                            # 0 = gpu, 1 = cpu
+
+
+# cuda function to calculate mandelbrot iterations
 @cuda.jit(device=True)
 def calcMandel(c):
     Z = complex(0, 0)
@@ -20,10 +39,11 @@ def calcMandel(c):
     # for i in range(MAX_ITER):
     return 0
 
-
+# cuda function to calculate the mandelbrot image
+# image: image that will get visualized
+# input_matrix: matrix containing the coordinates of all pixels as complex numbers
 @cuda.jit
 def render_gpu(image, input_matrix):
-
     i = cuda.grid(1)
     width = image.shape[0]
     height = image.shape[1]
@@ -33,13 +53,14 @@ def render_gpu(image, input_matrix):
 
         v = calcMandel(input_matrix[x, y])
 
-        #image[x, y, 0] = 1 / 4 * v % 255
+        # color image from given mandel number
+        image[x, y, :] = 5 * v % 255        # black and white image
+        #image[x, y, 0] = 1 / 4 * v % 255   #attempted coloring (doesnt look good)
         #image[x, y, 1] = 1 / 5 * v % 255
         #image[x, y, 2] = 1 / 7 * v % 255
-        image[x, y, :] = 5 * v % 255
-    return
 
 
+# cpu mandel calculation
 def calcMandel_cpu(c):
     z = 0.0j
     for i in range(MAX_ITER):
@@ -50,16 +71,18 @@ def calcMandel_cpu(c):
     return 0
 
 
+# cpu function to calculate the mandelbrot image
+# image: image that will get visualized
+# input_matrix: matrix containing the coordinates of all pixels as complex numbers
 def render_cpu(image, input_Matrix):
     x = input_Matrix.shape[0]
     y = input_Matrix.shape[1]
     for i in range(x):
         for j in range(y):
             v = calcMandel_cpu(input_Matrix[i, j])
-            image[i, j, :] = v
-    return
+            image[i, j, :] = v # black and white coloring
 
-
+#update mandel image
 def display_update_mandel():
     global surface
     x_min = start_point[0] - radius
@@ -86,43 +109,35 @@ def display_update_mandel():
     return truncate(render_time, 3)
 
 
-#mandelbrot settings
-
-WIDTH = 900
-HEIGHT = WIDTH
-MAX_ITER = 255
-UPPER_BOUND = 4
-start_point = [-1.3887052905883253, 0]
-radius = 0.02579603060046148
-
-#pygame settings
-sidebar = 400
-w, h = WIDTH + sidebar, HEIGHT
-color = (255, 255, 190)
-ctime = 0
-mode = 0 #0 = gpu, 1 = cpu
-
-pygame.init()
-display = pygame.display.set_mode((w, h))
-pygame.display.set_caption("Mandelbrot Visualization")
-font_head = pygame.font.SysFont("Verdana", 35, bold=False)
-font_main = pygame.font.SysFont("Verdana", 25)
-running = True
-
-image = np.zeros((WIDTH, HEIGHT, 3), dtype=np.uint8)
-a = np.arange(0, WIDTH)
-b = np.arange(0, HEIGHT)
-A, B = np.meshgrid(a, b)
-Z = A + B
-Z = 255 * Z / Z.max()
-
-surface = pygame.surfarray.make_surface(image)
-display.fill((0, 0, 0))
-
-threadsperblock = 128
-blocks = (image.shape[0] * image.shape[1] + (threadsperblock - 1)) // threadsperblock
+# draw a text on the display
+# text: text to display
+# font: display font
+# color: display color
+# surface: surface to draw on
+# x, y. x and y coordinates starting from the top left corner
+def draw_text(text, font, color, surface, x, y):
+    textobj = font.render(text, 1, color)
+    textrect = textobj.get_rect()
+    textrect.topleft = (x, y)
+    surface.blit(textobj, textrect)
 
 
+# truncates a number
+# n: input number
+# m: positions to truncate
+def truncate(n, m):
+    return int(n * 10**m) / 10**m
+
+
+# update screen with new information
+def update_screen():
+    global ctime
+    display.fill((0, 0, 0))
+    ctime = display_update_mandel()
+    draw_sidebar()
+
+
+# staticly drawn sidebar
 def draw_sidebar():
     draw_text('main menu', font_head, color, display, 30, 30)
     draw_text('calculation time', font_main, color, display, 30, 100)
@@ -138,57 +153,55 @@ def draw_sidebar():
     draw_text("screenshot [F12]", font_main, color, display, 30, 630)
 
 
-def draw_text(text, font, color, surface, x, y):
-    textobj = font.render(text, 1, color)
-    textrect = textobj.get_rect()
-    textrect.topleft = (x, y)
-    surface.blit(textobj, textrect)
+if __name__ == '__main__':
+    pygame.init()
+    display = pygame.display.set_mode((w, h))
+    pygame.display.set_caption("Mandelbrot Visualization")
+    font_head = pygame.font.SysFont("Verdana", 35, bold=False)
+    font_main = pygame.font.SysFont("Verdana", 25)
+    running = True
 
+    image = np.zeros((WIDTH, HEIGHT, 3), dtype=np.uint8)
 
-def truncate(n, m):
-    return int(n * 10**m) / 10**m
-
-
-def update_screen():
-    global ctime
+    surface = pygame.surfarray.make_surface(image)
     display.fill((0, 0, 0))
-    ctime = display_update_mandel()
+
+    threadsperblock = 128
+    blocks = (image.shape[0] * image.shape[1] + (threadsperblock - 1)) // threadsperblock
+
     draw_sidebar()
+    update_screen()
+    while running:
 
-
-draw_sidebar()
-update_screen()
-while running:
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.key == pygame.K_s:
-                radius *= 1.2
-                update_screen()
-            if event.key == pygame.K_w:
-                radius *= 1/1.2
-                update_screen()
-            if event.key == pygame.K_DOWN:
-                start_point[0] += 1/3 * radius
-                update_screen()
-            if event.key == pygame.K_UP:
-                start_point[0] -= 1 / 3 * radius
-                update_screen()
-            if event.key == pygame.K_LEFT:
-                start_point[1] += 1 / 3 * radius
-                update_screen()
-            if event.key == pygame.K_RIGHT:
-                start_point[1] -= 1 / 3 * radius
-                update_screen()
-            if event.key == pygame.K_F12:
-                abschnitt = str(start_point) + " " + str(radius)
-                print(abschnitt)
-                pygame.image.save(display, "screenshot" + abschnitt + ".jpg")
-                print("screenshot saved")
-    pygame.display.update()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+                if event.key == pygame.K_s:
+                    radius *= 1.2
+                    update_screen()
+                if event.key == pygame.K_w:
+                    radius *= 1 / 1.2
+                    update_screen()
+                if event.key == pygame.K_DOWN:
+                    start_point[0] += 1 / 3 * radius
+                    update_screen()
+                if event.key == pygame.K_UP:
+                    start_point[0] -= 1 / 3 * radius
+                    update_screen()
+                if event.key == pygame.K_LEFT:
+                    start_point[1] += 1 / 3 * radius
+                    update_screen()
+                if event.key == pygame.K_RIGHT:
+                    start_point[1] -= 1 / 3 * radius
+                    update_screen()
+                if event.key == pygame.K_F12:
+                    abschnitt = str(start_point) + " " + str(radius)
+                    print(abschnitt)
+                    pygame.image.save(display, "screenshot" + abschnitt + ".jpg")
+                    print("screenshot saved")
+        pygame.display.update()
