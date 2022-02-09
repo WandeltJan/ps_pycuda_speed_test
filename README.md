@@ -20,3 +20,14 @@ Lite der verwendeten Tools:
 ***
 im Installations Guide von PyCuda sollten alle Notwendigen Tolls installiert werden
 https://wiki.tiker.net/PyCuda/Installation/
+
+### Mandelbrot Visualizer
+***
+Dieses Programm dient der visualisierung der Mandelbrot Menge. Shortcuts:
+* F12 Screenshot des momentanen Fensters
+* W Zoom in
+* S Zoom out
+* Arrow keys Bewegen des momentanen Bildausschnittes
+* ESC Quit
+
+Bei zu starkem zoom wird das Bild sehr verpixelt, da die Zahlen für Python zu klein werden. mpmath ist leider zum momentanen Zeipunkt nicht mit numba kompatibel.
