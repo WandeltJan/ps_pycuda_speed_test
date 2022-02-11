@@ -5,6 +5,7 @@ Ein Projekt für den Parallele Systeme Kurs der Hochschule Karlsruhe
 1. [Allgemeine Informationen](#allgemeine-informationen)
 2. [Verwendete Technologien](#verwendete-technologien)
 3. [Installation](#installation)
+4. [Mandelbrot Visualizer] (#Visualizer)
 ### Allgemeine Informationen
 ***
 Das Projekt dient dem Vergleichen der Geschwindigkeit von Berechnungen mit Cuda und herkömmlichen CPU Berechnungen.
